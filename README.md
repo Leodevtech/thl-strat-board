@@ -31,6 +31,7 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 ### ☁️ Smokes et grenades
 - **Clic simple** : l'objet est posé au point d'impact.
 - **Glisser du lanceur vers l'impact** : la trajectoire s'affiche en pointillé.
+- **Pivoter la trajectoire** : sélectionne la smoke ou la grenade, puis attrape le **rond blanc** au point de lancer. La trajectoire pivote autour du nuage. Ramène le rond sur le nuage pour supprimer la trajectoire.
 
 **Et aussi :**
 - 🗺️ Import de **n'importe quelle carte** : bouton, glisser-déposer ou `Ctrl+V` d'une capture d'écran
@@ -59,7 +60,7 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 
 ## 📝 Nouveautés
 
-- **Novembre 2026** : champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
+- **Novembre 2026** : trajectoire des smokes et grenades réglable avec une poignée, champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
 - **Octobre 2026** : première version (pions, drapeaux, dessin, flèches, ping, export PNG, sauvegarde `.json`).
 
 ---

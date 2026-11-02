@@ -186,7 +186,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <button data-mini="1" aria-pressed="true">Petit nuage</button>
         <button data-mini="0" aria-pressed="false">Zone de fumée</button>
       </div>
-      <p class="hint">Clic simple : pose à l'impact. Glisse du lanceur vers l'impact pour afficher la trajectoire en pointillé.</p>
+      <p class="hint">Clic simple : pose à l'impact. Glisse du lanceur vers l'impact pour afficher la trajectoire en pointillé. Pour la modifier ensuite, sélectionne la smoke et attrape le rond blanc au point de lancer : la trajectoire pivote autour du nuage. Ramène le rond sur le nuage pour supprimer la trajectoire.</p>
     </section>
 
     <section class="sec" id="secColor">
@@ -450,6 +450,9 @@ function render(){
   if(st.sel&&st.sel.t==='pawn'&&st.sel.dir!=null){ const tp=fovTip(st.sel), r=7/view.s;
     ctx.save(); ctx.beginPath(); ctx.moveTo(st.sel.x,st.sel.y); ctx.lineTo(tp.x,tp.y); ctx.setLineDash([4/view.s,4/view.s]); ctx.lineWidth=1.4/view.s; ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.stroke();
     ctx.setLineDash([]); ctx.beginPath(); ctx.arc(tp.x,tp.y,r,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=2/view.s; ctx.strokeStyle='#f2a33a'; ctx.stroke(); ctx.restore(); }
+  if(st.sel&&(st.sel.t==='smoke'||st.sel.t==='nade')){ const h=throwHandle(st.sel), r=7/view.s;
+    ctx.save(); if(st.sel.fx==null){ ctx.beginPath(); ctx.moveTo(st.sel.x,st.sel.y); ctx.lineTo(h.x,h.y); ctx.setLineDash([4/view.s,4/view.s]); ctx.lineWidth=1.4/view.s; ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.stroke(); ctx.setLineDash([]); }
+    ctx.beginPath(); ctx.arc(h.x,h.y,r,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=2/view.s; ctx.strokeStyle='#f2a33a'; ctx.stroke(); ctx.restore(); }
   if(st.sel){ const b=bbox(st.sel); ctx.save(); ctx.setLineDash([6/view.s,4/view.s]); ctx.lineWidth=1.6/view.s; ctx.strokeStyle='#f2a33a'; ctx.strokeRect(b.x-6*U,b.y-6*U,b.w+12*U,b.h+12*U); ctx.restore(); }
   $('#chip').innerHTML=chipText();
 }
@@ -473,6 +476,7 @@ function bbox(o){
   let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity; for(let i=0;i<o.pts.length;i+=2){a=Math.min(a,o.pts[i]);c=Math.max(c,o.pts[i]);b=Math.min(b,o.pts[i+1]);d=Math.max(d,o.pts[i+1]);} return {x:a,y:b,w:c-a,h:d-b};
 }
 const smokeR=o=>(o.t==='nade'?36:o.mini?20:55)*U*o.size;
+function throwHandle(o){ return o.fx!=null ? {x:o.fx,y:o.fy} : {x:o.x-smokeR(o)-40*U, y:o.y+smokeR(o)*.6+20*U}; }
 function defaultDir(p){ const dx=imgW/2-p.x, dy=imgH/2-p.y; return Math.hypot(dx,dy)<20*U?-Math.PI/2:Math.atan2(dy,dx); }
 function segD(px,py,ax,ay,bx,by){ const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy; let t=l?((px-ax)*dx+(py-ay)*dy)/l:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-ax-t*dx,py-ay-t*dy); }
 function hit(p, onlyTokens){
@@ -511,7 +515,9 @@ cv.addEventListener('pointerdown',e=>{
   if(e.button===1||e.button===2||space){ act=startPan(s); return; }
   const p=toImg(s);
   if(st.sel&&st.sel.t==='pawn'&&st.sel.dir!=null&&st.tool!=='eraser'){ const tp=fovTip(st.sel); if(Math.hypot(p.x-tp.x,p.y-tp.y)<16/view.s){ act={type:'aim',o:st.sel,snapped:false}; return; } }
+  if(st.sel&&(st.sel.t==='smoke'||st.sel.t==='nade')&&st.tool!=='eraser'){ const h=throwHandle(st.sel); if(Math.hypot(p.x-h.x,p.y-h.y)<16/view.s){ act={type:'throw',o:st.sel,snapped:false}; return; } }
   if(['pawn','flag','ping'].includes(st.tool)){ const h=hit(p,true); if(h){ select(h); act={type:'move',o:h,last:p,moved:false}; return; } }
+  if(st.tool==='smoke'||st.tool==='nade'){ const h=hit(p); if(h&&h.t===st.tool){ select(h); act={type:'move',o:h,last:p,moved:false}; return; } }
   switch(st.tool){
     case 'select': { const h=hit(p); if(h){ select(h); act={type:'move',o:h,last:p,moved:false}; } else { select(null); act=startPan(s); } break; }
     case 'pawn': { snap(); select(null); const o={t:'pawn',team:st.team,n:st.num,x:p.x,y:p.y,size:st.size,dir:st.fov?defaultDir(p):null}; objs.push(o); advanceNum();
@@ -536,6 +542,7 @@ cv.addEventListener('pointermove',e=>{
   if(act.type==='pan'){ view.x=act.vx+s.x-act.sx; view.y=act.vy+s.y-act.sy; draw(); }
   else if(act.type==='move'){ if(!act.moved){ snap(); act.moved=true; } move(act.o,p.x-act.last.x,p.y-act.last.y); act.last=p; draw(); }
   else if(act.type==='aim'){ const o=act.o; if(Math.hypot(p.x-o.x,p.y-o.y)>6*U){ if(!act.snapped){ snap(); act.snapped=true; } o.dir=Math.atan2(p.y-o.y,p.x-o.x); draw(); } }
+  else if(act.type==='throw'){ const o=act.o; if(!act.snapped){ snap(); act.snapped=true; } o.fx=p.x; o.fy=p.y; draw(); }
   else if(act.type==='draw'){ const o=act.o;
     if(o.t==='pen'){ const lx=o.pts[o.pts.length-2], ly=o.pts[o.pts.length-1]; if(Math.hypot(p.x-lx,p.y-ly)>2/view.s) o.pts.push(p.x,p.y); }
     else if(o.t==='smoke'||o.t==='nade'){ o.x=p.x; o.y=p.y; }
@@ -550,6 +557,7 @@ function endPtr(e){
     else if(o.t==='cone') ok=Math.hypot(o.x2-o.x,o.y2-o.y)>15*U;
     else ok=Math.hypot(o.x2-o.x1,o.y2-o.y1)>12*U;
     if(ok){ snap(); objs.push(o); } }
+  if(act&&act.type==='throw'){ const o=act.o; if(o.fx!=null&&Math.hypot(o.x-o.fx,o.y-o.fy)<15*U){ delete o.fx; delete o.fy; } }
   act=null; syncPickers(); draw();
 }
 cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
