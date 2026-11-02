@@ -13,12 +13,24 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 | Outil | Raccourci | Description |
 |---|---|---|
 | Déplacer | `V` | Sélectionner et déplacer n'importe quel élément |
-| Pion joueur | `J` | Pions numérotés de 1 à 5, en **bleu** (nous) ou en **rouge** (adversaire) |
+| Pion joueur | `J` | Pions numérotés de 1 à 5, en **bleu** (nous) ou en **rouge** (adversaire), avec un **champ de vision de 65°** pour montrer où regarder |
 | Drapeau | `D` | Drapeaux **A / B / C**, en jaune (neutre), bleu (à nous) ou rouge (à eux) |
 | Dessin libre | `P` | Tracé à main levée, plein ou en pointillé |
 | Flèche | `F` | Rushs, rotations, contournements |
 | Ping | `G` | Signaler un point précis (angle, danger, cible) |
+| Cône de vision | `C` | Zone transparente pour définir une ligne à tenir, avec ouverture réglable de 15° à 180° |
+| Smoke | `S` | **Petit nuage** pour pinguer où smoker, ou **zone de fumée** en grand |
+| Grenade | `N` | Zone d'explosion avec l'icône de la grenade |
 | Gomme | `E` | Effacer un élément au clic ou au glisser |
+
+### 👁️ Champ de vision des pions
+- Pose le pion, puis **glisse sans lâcher** vers l'endroit où il doit regarder.
+- Pour le réorienter, sélectionne le pion et attrape le **rond blanc** au bout du cône.
+- La case **« Champ de vision 65° »** l'active ou le désactive.
+
+### ☁️ Smokes et grenades
+- **Clic simple** : l'objet est posé au point d'impact.
+- **Glisser du lanceur vers l'impact** : la trajectoire s'affiche en pointillé.
 
 **Et aussi :**
 - 🗺️ Import de **n'importe quelle carte** : bouton, glisser-déposer ou `Ctrl+V` d'une capture d'écran
@@ -37,11 +49,18 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 1. Ouvre l'outil dans ton navigateur (PC ou mobile).
 2. Clique sur **Importer une carte** et choisis ta capture de la map.
 3. Donne un nom à ta **strat** (par exemple « Spawn ouest · prise de B »).
-4. Place les drapeaux A, B et C, puis tes pions 1 à 5 et ceux de l'adversaire.
-5. Dessine les flèches de déplacement et ajoute des pings.
+4. Place les drapeaux A, B et C, puis tes pions 1 à 5 en les orientant vers l'angle à tenir.
+5. Dessine les flèches de déplacement, puis ajoute les smokes, les grenades et les pings.
 6. Clique sur **Exporter l'image**, puis sur **Copier l'image**, et colle-la dans Discord.
 
 > 💡 Chacun travaille sur sa propre copie, dans son navigateur. Pour partager une strat modifiable, envoie le fichier `.json` obtenu avec **Sauver la strat**. Ton mate l'ouvre ensuite avec **Ouvrir une strat**.
+
+---
+
+## 📝 Nouveautés
+
+- **Novembre 2026** : champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
+- **Octobre 2026** : première version (pions, drapeaux, dessin, flèches, ping, export PNG, sauvegarde `.json`).
 
 ---
 

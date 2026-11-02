@@ -44,7 +44,7 @@ button,input{font:inherit;color:inherit}
 .btn svg{width:16px;height:16px}
 input[type=file]{display:none}
 
-.rail{grid-area:rail;display:flex;flex-direction:column;gap:6px;padding-top:2px}
+.rail{grid-area:rail;display:flex;flex-direction:column;gap:4px;padding-top:2px;overflow-y:auto;min-height:0}
 .tool{width:48px;height:48px;display:grid;place-items:center;background:transparent;border:1px solid transparent;border-radius:8px;cursor:pointer;color:var(--mute);position:relative}
 .tool svg{width:22px;height:22px}
 .tool:hover{background:var(--raise);color:var(--fg)}
@@ -135,6 +135,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <button class="tool" data-tool="pen" title="Dessin libre (P)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l4-1L19 8l-3-3L5 16z"/><path d="M14 7l3 3"/></svg><kbd>P</kbd></button>
     <button class="tool" data-tool="arrow" title="Flèche (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 19L19 5M10 5h9v9"/></svg><kbd>F</kbd></button>
     <button class="tool" data-tool="ping" title="Ping (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><kbd>G</kbd></button>
+    <button class="tool" data-tool="cone" title="Cône de vision (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19L19 6a9 9 0 0 1 1 9z" fill="currentColor" fill-opacity=".25"/><circle cx="4" cy="19" r="1.6" fill="currentColor"/></svg><kbd>C</kbd></button>
+    <button class="tool" data-tool="smoke" title="Smoke (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6-1.2A4.5 4.5 0 0 1 17 18z"/></svg><kbd>S</kbd></button>
+    <button class="tool" data-tool="nade" title="Grenade (N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="14" r="6"/><path d="M11 8V5h4M14 5l3-2"/></svg><kbd>N</kbd></button>
     <button class="tool" data-tool="eraser" title="Gomme (E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 20h12M5 15l9-9 5 5-8 8H8z"/></svg><kbd>E</kbd></button>
     <hr>
     <button class="tool" id="btnUndo" title="Annuler (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
@@ -161,13 +164,29 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <button class="team" data-team="r"><i></i>Adversaire</button>
       </div>
       <div class="nums" id="nums"></div>
-      <p class="hint">Clique sur la carte pour poser le numéro choisi. Le suivant se sélectionne tout seul. Clique un pion déjà posé pour le déplacer.</p>
+      <label class="check"><input type="checkbox" id="fov" checked> Champ de vision 65°</label>
+      <p class="hint">Touche la carte pour poser le pion, puis glisse sans lâcher vers l'endroit où il doit regarder. Pour le tourner plus tard, sélectionne-le et attrape le rond blanc au bout du cône. Glisse le pion lui-même pour le déplacer.</p>
     </section>
 
     <section class="sec" id="secFlag" hidden>
       <h3>Drapeaux</h3>
       <div class="nums" id="flags"></div>
       <p class="hint">Couleur du drapeau : jaune = neutre, bleu = à nous, rouge = à eux.</p>
+    </section>
+
+    <section class="sec" id="secCone" hidden>
+      <h3>Ouverture du cône <em id="coneVal">70°</em></h3>
+      <input type="range" id="coneA" min="15" max="180" step="5" value="70">
+      <p class="hint">Glisse depuis la position du joueur vers l'endroit à surveiller. La longueur du geste donne la portée.</p>
+    </section>
+
+    <section class="sec" id="secThrow" hidden>
+      <h3 id="throwTitle">Lancer</h3>
+      <div class="seg" id="smokeSeg" role="group" aria-label="Style de smoke">
+        <button data-mini="1" aria-pressed="true">Petit nuage</button>
+        <button data-mini="0" aria-pressed="false">Zone de fumée</button>
+      </div>
+      <p class="hint">Clic simple : pose à l'impact. Glisse du lanceur vers l'impact pour afficher la trajectoire en pointillé.</p>
     </section>
 
     <section class="sec" id="secColor">
@@ -234,7 +253,7 @@ const OUT = '#0b0e12';
 let img=null, imgW=1600, imgH=1000, U=1.6;
 let objs=[], undoS=[], redoS=[];
 const view={s:1,x:0,y:0};
-const st={tool:'pawn', team:'b', num:1, flag:'A', color:BLUE, size:1, dash:false, sel:null, grid:false};
+const st={tool:'pawn', team:'b', num:1, flag:'A', color:BLUE, size:1, dash:false, sel:null, grid:false, cone:70, fov:true, mini:true};
 let needFit=true;
 
 const lum = h => { const n=parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255; };
@@ -292,8 +311,80 @@ function drawPen(c,o,u){
     for(let i=2;i<p.length-2;i+=2){ c.quadraticCurveTo(p[i],p[i+1],(p[i]+p[i+2])/2,(p[i+1]+p[i+3])/2); }
     c.lineTo(p[p.length-2],p[p.length-1]); });
 }
-const DRAW={pawn:drawPawn,flag:drawFlag,ping:drawPing,arrow:drawArrow,pen:drawPen};
+function drawThrow(c,o,u){
+  if(o.fx==null) return; const dx=o.x-o.fx, dy=o.y-o.fy, L=Math.hypot(dx,dy); if(L<1) return;
+  const mx=(o.fx+o.x)/2 + dy/L*L*.18, my=(o.fy+o.y)/2 - dx/L*L*.18, w=2.2*u;
+  c.save(); c.lineCap='round'; c.setLineDash([w*2.4,w*2.2]);
+  c.beginPath(); c.moveTo(o.fx,o.fy); c.quadraticCurveTo(mx,my,o.x,o.y);
+  c.lineWidth=w+2*u; c.strokeStyle='rgba(11,14,18,.8)'; c.stroke(); c.lineWidth=w; c.strokeStyle='#f5f7fa'; c.stroke();
+  c.setLineDash([]); c.beginPath(); c.arc(o.fx,o.fy,3.2*u,0,Math.PI*2); c.fillStyle='#f5f7fa'; c.fill(); c.lineWidth=1.5*u; c.strokeStyle=OUT; c.stroke();
+  c.restore();
+}
+const SMOKE_PUFFS=[[0,0,1],[-.45,-.3,.62],[.48,-.25,.66],[-.5,.32,.6],[.42,.38,.64],[0,-.55,.55],[0,.55,.55],[-.7,0,.5],[.72,.05,.5]];
+const FOV=65, FOV_LEN=4.2;
+function fovTip(o){ const L=15*U*o.size*FOV_LEN; return {x:o.x+Math.cos(o.dir)*L, y:o.y+Math.sin(o.dir)*L}; }
+function drawFov(c,o,u){
+  if(o.dir==null) return; const col=teamColor(o.team), L=15*u*o.size*FOV_LEN, h=FOV*Math.PI/360;
+  c.save(); c.beginPath(); c.moveTo(o.x,o.y); c.arc(o.x,o.y,L,o.dir-h,o.dir+h); c.closePath();
+  const g=c.createRadialGradient(o.x,o.y,0,o.x,o.y,L); g.addColorStop(0,hexA(col,.5)); g.addColorStop(1,hexA(col,.08));
+  c.fillStyle=g; c.fill(); c.lineJoin='round'; c.lineWidth=1.4*u; c.strokeStyle=hexA(col,.75); c.stroke(); c.restore();
+}
+function drawMiniCloud(c,o,u){
+  const R=16*u*o.size, x=o.x, y=o.y;
+  const shape=()=>{ c.beginPath();
+    c.arc(x-R*.55,y+R*.12,R*.45,0,Math.PI*2); c.moveTo(x+R*.6,y-R*.15); c.arc(x,y-R*.15,R*.6,0,Math.PI*2);
+    c.moveTo(x+R*1.0,y+R*.1); c.arc(x+R*.55,y+R*.1,R*.45,0,Math.PI*2); c.moveTo(x-R*.95,y+R*.15); rrect(c,x-R*.95,y+R*.05,R*1.9,R*.5,R*.25); };
+  c.save(); shape(); c.lineJoin='round'; c.lineWidth=3.6*u*Math.max(.8,o.size); c.strokeStyle=OUT; c.stroke();
+  shape(); c.fillStyle='#f4f6f8'; c.fill();
+  c.beginPath(); c.arc(x+R*.1,y-R*.3,R*.28,Math.PI*1.1,Math.PI*1.6); c.lineWidth=1.6*u; c.strokeStyle='rgba(255,255,255,.95)'; c.stroke();
+  c.beginPath(); rrect(c,x-R*.85,y+R*.42,R*1.7,R*.12,R*.06); c.fillStyle='rgba(150,160,170,.55)'; c.fill();
+  c.restore();
+}
+function drawSmoke(c,o,u){
+  drawThrow(c,o,u);
+  if(o.mini){ drawMiniCloud(c,o,u); return; }
+  const R=55*u*o.size; c.save();
+  for(const [ox,oy,k] of SMOKE_PUFFS){ const x=o.x+ox*R*.75, y=o.y+oy*R*.75, r=R*k*.72;
+    const g=c.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,'rgba(222,226,230,.62)'); g.addColorStop(.7,'rgba(200,205,210,.42)'); g.addColorStop(1,'rgba(190,195,200,0)');
+    c.fillStyle=g; c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill(); }
+  c.beginPath(); c.arc(o.x,o.y,R,0,Math.PI*2); c.setLineDash([5*u,5*u]); c.lineWidth=1.4*u; c.strokeStyle='rgba(235,238,242,.7)'; c.stroke();
+  c.setLineDash([]); c.fillStyle='rgba(11,14,18,.75)'; c.font=FONT(700,13*u*Math.max(.8,o.size)); c.textAlign='center'; c.textBaseline='middle'; c.fillText('SMOKE',o.x,o.y);
+  c.restore();
+}
+function drawNade(c,o,u){
+  drawThrow(c,o,u);
+  const R=36*u*o.size, r=9*u*Math.max(.8,o.size); c.save();
+  const g=c.createRadialGradient(o.x,o.y,0,o.x,o.y,R); g.addColorStop(0,'rgba(255,120,40,.45)'); g.addColorStop(1,'rgba(255,80,30,.12)');
+  c.fillStyle=g; c.beginPath(); c.arc(o.x,o.y,R,0,Math.PI*2); c.fill();
+  c.setLineDash([4*u,4*u]); c.lineWidth=1.6*u; c.strokeStyle='rgba(255,140,60,.9)'; c.stroke(); c.setLineDash([]);
+  c.lineJoin='round'; c.lineWidth=2*u; c.strokeStyle=OUT;
+  c.fillStyle='#5b6b3e'; c.beginPath(); c.arc(o.x,o.y+r*.15,r,0,Math.PI*2); c.fill(); c.stroke();
+  c.fillStyle='#8d9aa8'; c.beginPath(); rrect(c,o.x-r*.35,o.y-r*1.25,r*.7,r*.55,r*.12); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(o.x+r*.3,o.y-r*1.05); c.lineTo(o.x+r*.95,o.y-r*.35); c.lineWidth=2.2*u; c.stroke();
+  c.restore();
+}
+function drawCone(c,o,u){
+  const dx=o.x2-o.x, dy=o.y2-o.y, L=Math.hypot(dx,dy); if(L<1) return;
+  const ang=Math.atan2(dy,dx), h=(o.a||70)*Math.PI/360;
+  c.save(); c.beginPath(); c.moveTo(o.x,o.y); c.arc(o.x,o.y,L,ang-h,ang+h); c.closePath();
+  const g=c.createRadialGradient(o.x,o.y,0,o.x,o.y,L); g.addColorStop(0,hexA(o.color,.42)); g.addColorStop(1,hexA(o.color,.1));
+  c.fillStyle=g; c.fill();
+  c.lineJoin='round'; c.setLineDash([6*u,4*u]); c.lineWidth=1.8*u*Math.max(.8,o.size); c.strokeStyle=hexA(o.color,.9); c.stroke();
+  c.setLineDash([]); c.beginPath(); c.arc(o.x,o.y,4*u,0,Math.PI*2); c.fillStyle=o.color; c.fill(); c.lineWidth=1.5*u; c.strokeStyle=OUT; c.stroke();
+  c.restore();
+}
+function hexA(h,a){ const n=parseInt(h.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+const DRAW={pawn:drawPawn,flag:drawFlag,ping:drawPing,arrow:drawArrow,pen:drawPen,smoke:drawSmoke,nade:drawNade,cone:drawCone};
 const drawObj=(c,o,u)=>DRAW[o.t](c,o,u);
+const LAYER={cone:0,smoke:1,nade:2,pen:2,arrow:2,flag:3,ping:3,pawn:4};
+const ordered=()=>objs.map((o,i)=>[o,i]).sort((a,b)=>(lay(a[0])-lay(b[0]))||(a[1]-b[1])).map(x=>x[0]);
+const lay=o=>o.t==='smoke'&&o.mini?2.5:LAYER[o.t];
+function drawAll(c){
+  const list=ordered();
+  for(const o of list) if(o.t==='cone') drawObj(c,o,U);
+  for(const o of list) if(o.t==='pawn') drawFov(c,o,U);
+  for(const o of list) if(o.t!=='cone') drawObj(c,o,U);
+}
 
 function drawGrid(c,w,h,u){
   const cw=w/10, rh=h/10; c.save(); c.strokeStyle='rgba(255,255,255,.28)'; c.lineWidth=1.2*u; c.setLineDash([6*u,5*u]); c.beginPath();
@@ -328,12 +419,17 @@ function loadSample(){
     {t:'flag',label:'A',x:250,y:500,color:BLUE,size:1},
     {t:'flag',label:'B',x:800,y:500,color:YEL,size:1},
     {t:'flag',label:'C',x:1350,y:500,color:RED,size:1},
-    ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'b',n,x:[150,200,250,300,350][i],y:[420,380,600,560,430][i],size:1})),
-    ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'r',n,x:[1300,1360,1420,1460,1250][i],y:[400,600,420,560,610][i],size:1})),
+    ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'b',n,x:[150,200,250,300,350][i],y:[420,380,600,560,430][i],size:1,dir:[-.3,-.8,1.2,.4,0][i]})),
+    ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'r',n,x:[1300,1360,1420,1460,1250][i],y:[400,600,420,560,610][i],size:1,dir:[Math.PI,2.6,3.5,Math.PI,2.9][i]})),
+    {t:'smoke',mini:true,fx:250,fy:600,x:470,y:760,size:1},
     {t:'arrow',x1:330,y1:410,x2:700,y2:420,color:BLUE,size:1,dash:false},
     {t:'arrow',x1:330,y1:590,x2:720,y2:620,color:BLUE,size:1,dash:true},
     {t:'pen',pts:[200,370,300,300,450,260,600,250,720,280],color:'#36d07a',size:1,dash:false},
-    {t:'ping',x:880,y:380,color:YEL,size:1.2}
+    {t:'ping',x:880,y:380,color:YEL,size:1.2},
+    {t:'cone',x:300,y:560,x2:560,y2:640,a:60,color:BLUE,size:1},
+    {t:'cone',x:250,y:600,x2:360,y2:860,a:70,color:BLUE,size:1},
+    {t:'smoke',fx:350,fy:430,x:650,y:500,size:1},
+    {t:'nade',fx:330,fy:590,x:600,y:700,size:1}
   ];
 }
 
@@ -349,15 +445,19 @@ function render(){
   ctx.setTransform(dpr*view.s,0,0,dpr*view.s,dpr*view.x,dpr*view.y); ctx.imageSmoothingQuality='high';
   if(img) ctx.drawImage(img,0,0,imgW,imgH);
   if(st.grid) drawGrid(ctx,imgW,imgH,U);
-  for(const o of objs) drawObj(ctx,o,U);
+  drawAll(ctx);
   if(act&&act.type==='draw') drawObj(ctx,act.o,U);
+  if(st.sel&&st.sel.t==='pawn'&&st.sel.dir!=null){ const tp=fovTip(st.sel), r=7/view.s;
+    ctx.save(); ctx.beginPath(); ctx.moveTo(st.sel.x,st.sel.y); ctx.lineTo(tp.x,tp.y); ctx.setLineDash([4/view.s,4/view.s]); ctx.lineWidth=1.4/view.s; ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.stroke();
+    ctx.setLineDash([]); ctx.beginPath(); ctx.arc(tp.x,tp.y,r,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=2/view.s; ctx.strokeStyle='#f2a33a'; ctx.stroke(); ctx.restore(); }
   if(st.sel){ const b=bbox(st.sel); ctx.save(); ctx.setLineDash([6/view.s,4/view.s]); ctx.lineWidth=1.6/view.s; ctx.strokeStyle='#f2a33a'; ctx.strokeRect(b.x-6*U,b.y-6*U,b.w+12*U,b.h+12*U); ctx.restore(); }
   $('#chip').innerHTML=chipText();
 }
 function chipText(){
-  const t={select:'Déplacer',pawn:'Pion',flag:'Drapeau',pen:'Dessin libre',arrow:'Flèche',ping:'Ping',eraser:'Gomme'}[st.tool];
-  const d={select:'glisse un élément pour le déplacer',pawn:`clique pour poser ${st.team==='b'?'notre':'leur'} n°${st.num}`,flag:'clique pour poser le drapeau '+st.flag,
-    pen:'maintiens et dessine',arrow:'glisse du départ vers l’arrivée',ping:'clique pour pinguer',eraser:'clique ou glisse sur un élément'}[st.tool];
+  const t={select:'Déplacer',pawn:'Pion',flag:'Drapeau',pen:'Dessin libre',arrow:'Flèche',ping:'Ping',cone:'Cône de vision',smoke:'Smoke',nade:'Grenade',eraser:'Gomme'}[st.tool];
+  const d={select:'glisse un élément pour le déplacer',pawn:`pose ${st.team==='b'?'notre':'leur'} n°${st.num}${st.fov?', glisse pour l\u2019orienter':''}`,flag:'clique pour poser le drapeau '+st.flag,
+    pen:'maintiens et dessine',arrow:'glisse du départ vers l’arrivée',ping:'clique pour pinguer',cone:'glisse du joueur vers la zone à surveiller',
+    smoke:'clique sur l’impact, ou glisse du lanceur vers l’impact',nade:'clique sur l’impact, ou glisse du lanceur vers l’impact',eraser:'clique ou glisse sur un élément'}[st.tool];
   return `<strong>${t}</strong> · ${d}`;
 }
 
@@ -366,21 +466,36 @@ function bbox(o){
   if(o.t==='pawn'||o.t==='ping'){ const r=15*U*o.size*1.1; return {x:o.x-r,y:o.y-r,w:2*r,h:2*r}; }
   if(o.t==='flag'){ const r=17*U*o.size*1.3; return {x:o.x-r,y:o.y-r,w:2*r,h:2*r}; }
   if(o.t==='arrow') return {x:Math.min(o.x1,o.x2),y:Math.min(o.y1,o.y2),w:Math.abs(o.x2-o.x1),h:Math.abs(o.y2-o.y1)};
+  if(o.t==='smoke'||o.t==='nade'){ const r=smokeR(o); return {x:o.x-r,y:o.y-r,w:2*r,h:2*r}; }
+  if(o.t==='cone'){ const L=Math.hypot(o.x2-o.x,o.y2-o.y), ang=Math.atan2(o.y2-o.y,o.x2-o.x), h=(o.a||70)*Math.PI/360;
+    const xs=[o.x], ys=[o.y]; for(let k=0;k<=8;k++){ const t=ang-h+2*h*k/8; xs.push(o.x+Math.cos(t)*L); ys.push(o.y+Math.sin(t)*L); }
+    const x=Math.min(...xs), y=Math.min(...ys); return {x,y,w:Math.max(...xs)-x,h:Math.max(...ys)-y}; }
   let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity; for(let i=0;i<o.pts.length;i+=2){a=Math.min(a,o.pts[i]);c=Math.max(c,o.pts[i]);b=Math.min(b,o.pts[i+1]);d=Math.max(d,o.pts[i+1]);} return {x:a,y:b,w:c-a,h:d-b};
 }
+const smokeR=o=>(o.t==='nade'?36:o.mini?20:55)*U*o.size;
+function defaultDir(p){ const dx=imgW/2-p.x, dy=imgH/2-p.y; return Math.hypot(dx,dy)<20*U?-Math.PI/2:Math.atan2(dy,dx); }
 function segD(px,py,ax,ay,bx,by){ const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy; let t=l?((px-ax)*dx+(py-ay)*dy)/l:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-ax-t*dx,py-ay-t*dy); }
 function hit(p, onlyTokens){
   const tol=8/view.s;
-  for(let i=objs.length-1;i>=0;i--){ const o=objs[i];
+  const list=ordered();
+  for(let i=list.length-1;i>=0;i--){ const o=list[i];
     if(o.t==='pawn'||o.t==='ping'){ if(Math.hypot(p.x-o.x,p.y-o.y)<15*U*o.size*1.1+tol) return o; }
     else if(o.t==='flag'){ if(Math.abs(p.x-o.x)+Math.abs(p.y-o.y)<17*U*o.size*1.3+tol) return o; }
     else if(onlyTokens) continue;
     else if(o.t==='arrow'){ if(segD(p.x,p.y,o.x1,o.y1,o.x2,o.y2)<4*U*o.size+tol) return o; }
     else if(o.t==='pen'){ for(let j=0;j<o.pts.length-2;j+=2) if(segD(p.x,p.y,o.pts[j],o.pts[j+1],o.pts[j+2],o.pts[j+3])<3.2*U*o.size+tol) return o; }
+    else if(o.t==='smoke'||o.t==='nade'){ const r=smokeR(o); if(Math.hypot(p.x-o.x,p.y-o.y)<r+tol) return o; }
+    else if(o.t==='cone'){ const L=Math.hypot(o.x2-o.x,o.y2-o.y), d=Math.hypot(p.x-o.x,p.y-o.y);
+      if(d<8*U+tol) return o;
+      if(d<=L+tol){ let da=Math.atan2(p.y-o.y,p.x-o.x)-Math.atan2(o.y2-o.y,o.x2-o.x); da=Math.atan2(Math.sin(da),Math.cos(da)); if(Math.abs(da)<=(o.a||70)*Math.PI/360) return o; } }
   }
   return null;
 }
-function move(o,dx,dy){ if(o.t==='arrow'){o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;} else if(o.t==='pen'){for(let i=0;i<o.pts.length;i+=2){o.pts[i]+=dx;o.pts[i+1]+=dy;}} else {o.x+=dx;o.y+=dy;} }
+function move(o,dx,dy){
+  if(o.t==='arrow'){o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;}
+  else if(o.t==='pen'){for(let i=0;i<o.pts.length;i+=2){o.pts[i]+=dx;o.pts[i+1]+=dy;}}
+  else { o.x+=dx;o.y+=dy; if(o.fx!=null){o.fx+=dx;o.fy+=dy;} if(o.x2!=null){o.x2+=dx;o.y2+=dy;} }
+}
 
 /* ---------- Pointer input ---------- */
 const ptrs=new Map(); let act=null, pinch=null, space=false;
@@ -395,14 +510,18 @@ cv.addEventListener('pointerdown',e=>{
   if(ptrs.size>2) return;
   if(e.button===1||e.button===2||space){ act=startPan(s); return; }
   const p=toImg(s);
+  if(st.sel&&st.sel.t==='pawn'&&st.sel.dir!=null&&st.tool!=='eraser'){ const tp=fovTip(st.sel); if(Math.hypot(p.x-tp.x,p.y-tp.y)<16/view.s){ act={type:'aim',o:st.sel,snapped:false}; return; } }
   if(['pawn','flag','ping'].includes(st.tool)){ const h=hit(p,true); if(h){ select(h); act={type:'move',o:h,last:p,moved:false}; return; } }
   switch(st.tool){
     case 'select': { const h=hit(p); if(h){ select(h); act={type:'move',o:h,last:p,moved:false}; } else { select(null); act=startPan(s); } break; }
-    case 'pawn': { snap(); const o={t:'pawn',team:st.team,n:st.num,x:p.x,y:p.y,size:st.size}; objs.push(o); advanceNum(); act={type:'move',o,last:p,moved:true}; break; }
+    case 'pawn': { snap(); select(null); const o={t:'pawn',team:st.team,n:st.num,x:p.x,y:p.y,size:st.size,dir:st.fov?defaultDir(p):null}; objs.push(o); advanceNum();
+      act=st.fov?{type:'aim',o,snapped:true}:{type:'move',o,last:p,moved:true}; break; }
     case 'flag': { snap(); const o={t:'flag',label:st.flag,x:p.x,y:p.y,color:st.color,size:st.size}; objs.push(o); advanceFlag(); act={type:'move',o,last:p,moved:true}; break; }
     case 'ping': { snap(); const o={t:'ping',x:p.x,y:p.y,color:st.color,size:st.size}; objs.push(o); act={type:'move',o,last:p,moved:true}; break; }
     case 'pen': act={type:'draw',o:{t:'pen',pts:[p.x,p.y],color:st.color,size:st.size,dash:st.dash}}; break;
     case 'arrow': act={type:'draw',o:{t:'arrow',x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:st.color,size:st.size,dash:st.dash}}; break;
+    case 'cone': act={type:'draw',o:{t:'cone',x:p.x,y:p.y,x2:p.x,y2:p.y,a:st.cone,color:st.color,size:st.size}}; break;
+    case 'smoke': case 'nade': { const o={t:st.tool,fx:p.x,fy:p.y,x:p.x,y:p.y,size:st.size}; if(st.tool==='smoke'&&st.mini) o.mini=true; act={type:'draw',o}; break; }
     case 'eraser': act={type:'erase',snapped:false}; eraseAt(p); break;
   }
   draw();
@@ -416,14 +535,21 @@ cv.addEventListener('pointermove',e=>{
   if(!act) return;
   if(act.type==='pan'){ view.x=act.vx+s.x-act.sx; view.y=act.vy+s.y-act.sy; draw(); }
   else if(act.type==='move'){ if(!act.moved){ snap(); act.moved=true; } move(act.o,p.x-act.last.x,p.y-act.last.y); act.last=p; draw(); }
+  else if(act.type==='aim'){ const o=act.o; if(Math.hypot(p.x-o.x,p.y-o.y)>6*U){ if(!act.snapped){ snap(); act.snapped=true; } o.dir=Math.atan2(p.y-o.y,p.x-o.x); draw(); } }
   else if(act.type==='draw'){ const o=act.o;
     if(o.t==='pen'){ const lx=o.pts[o.pts.length-2], ly=o.pts[o.pts.length-1]; if(Math.hypot(p.x-lx,p.y-ly)>2/view.s) o.pts.push(p.x,p.y); }
+    else if(o.t==='smoke'||o.t==='nade'){ o.x=p.x; o.y=p.y; }
     else { o.x2=p.x; o.y2=p.y; } draw(); }
   else if(act.type==='erase') eraseAt(p);
 });
 function endPtr(e){
   ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null;
-  if(act&&act.type==='draw'){ const o=act.o; const ok=o.t==='pen'?o.pts.length>=4:Math.hypot(o.x2-o.x1,o.y2-o.y1)>12*U; if(ok){ snap(); objs.push(o); } }
+  if(act&&act.type==='draw'){ const o=act.o; let ok;
+    if(o.t==='pen') ok=o.pts.length>=4;
+    else if(o.t==='smoke'||o.t==='nade'){ ok=true; if(Math.hypot(o.x-o.fx,o.y-o.fy)<15*U){ delete o.fx; delete o.fy; } }
+    else if(o.t==='cone') ok=Math.hypot(o.x2-o.x,o.y2-o.y)>15*U;
+    else ok=Math.hypot(o.x2-o.x1,o.y2-o.y1)>12*U;
+    if(ok){ snap(); objs.push(o); } }
   act=null; syncPickers(); draw();
 }
 cv.addEventListener('pointerup',endPtr); cv.addEventListener('pointercancel',endPtr);
@@ -459,7 +585,7 @@ function syncPickers(){
 function select(o){
   st.sel=o; $('#secSel').hidden=!o;
   if(o){ st.size=o.size; if(o.color) st.color=o.color; if('dash' in o) st.dash=o.dash;
-    if(o.t==='pawn'){ st.team=o.team; st.num=o.n; } if(o.t==='flag') st.flag=o.label; syncUI(); }
+    if(o.t==='pawn'){ st.team=o.team; st.num=o.n; } if(o.t==='flag') st.flag=o.label; if(o.t==='cone') st.cone=o.a||70; syncUI(); }
   updatePanels(); draw();
 }
 function applyToSel(fn){ if(st.sel){ snapSoft(); fn(st.sel); draw(); } }
@@ -473,13 +599,24 @@ function syncUI(){
   const nm=COLORS.find(c=>c.c===st.color); $('#colName').textContent=nm?nm.n:'';
   $('#size').value=st.size; $('#sizeVal').textContent=Math.round(st.size*100)+' %';
   $('#dashSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.dash==='1')===st.dash)));
+  $('#coneA').value=st.cone; $('#coneVal').textContent=st.cone+'°';
+  $('#smokeSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.mini==='1')===st.mini)));
+  $('#fov').checked = st.sel&&st.sel.t==='pawn' ? st.sel.dir!=null : st.fov;
   syncPickers();
 }
+$('#fov').addEventListener('change',e=>{ const on=e.target.checked;
+  if(st.sel&&st.sel.t==='pawn') applyToSel(o=>o.dir=on?(o.dir!=null?o.dir:defaultDir(o)):null); else st.fov=on; });
+$('#smokeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; st.mini=b.dataset.mini==='1';
+  if(st.sel&&st.sel.t==='smoke') applyToSel(o=>{ if(st.mini) o.mini=true; else delete o.mini; }); syncUI(); });
+$('#coneA').addEventListener('input',e=>{ st.cone=+e.target.value; $('#coneVal').textContent=st.cone+'°'; if(st.sel&&st.sel.t==='cone') applyToSel(o=>o.a=st.cone); });
 function updatePanels(){
   const t=st.sel?st.sel.t:st.tool;
   $('#secPawn').hidden=t!=='pawn';
   $('#secFlag').hidden=t!=='flag';
-  $('#secColor').hidden=t==='pawn';
+  $('#secCone').hidden=t!=='cone';
+  $('#secThrow').hidden=!(t==='smoke'||t==='nade'); $('#throwTitle').textContent=t==='nade'?'Grenade':'Smoke'; $('#smokeSeg').hidden=t!=='smoke';
+  $('#fov').checked = st.sel&&st.sel.t==='pawn' ? st.sel.dir!=null : st.fov;
+  $('#secColor').hidden=['pawn','smoke','nade'].includes(t);
   $('#dashSeg').hidden=!['pen','arrow'].includes(t);
 }
 function setTool(t,keepSel){
@@ -512,7 +649,7 @@ document.addEventListener('keydown',e=>{
   if((e.key==='Delete'||e.key==='Backspace')&&st.sel){ e.preventDefault(); $('#btnDel').click(); return; }
   if(e.key==='Escape'){ select(null); return; }
   if(/^[1-5]$/.test(e.key)){ numsEl.querySelector(`[data-n="${e.key}"]`).click(); return; }
-  const t={v:'select',j:'pawn',d:'flag',p:'pen',f:'arrow',g:'ping',e:'eraser'}[e.key.toLowerCase()]; if(t) setTool(t);
+  const t={v:'select',j:'pawn',d:'flag',p:'pen',f:'arrow',g:'ping',c:'cone',s:'smoke',n:'nade',e:'eraser'}[e.key.toLowerCase()]; if(t) setTool(t);
 });
 document.addEventListener('keyup',e=>{ if(e.code==='Space'){ space=false; setTool(st.tool,true); } });
 
@@ -542,7 +679,7 @@ function renderExport(){
   const k=Math.min(1,4096/Math.max(imgW,imgH)), W=Math.round(imgW*k), H=Math.round(imgH*k);
   const band=$('#band').checked?Math.round(Math.max(54,W*.045)):0;
   const c=document.createElement('canvas'); c.width=W; c.height=H+band; const g=c.getContext('2d');
-  g.save(); g.scale(k,k); g.imageSmoothingQuality='high'; g.drawImage(img,0,0,imgW,imgH); if(st.grid) drawGrid(g,imgW,imgH,U); for(const o of objs) drawObj(g,o,U); g.restore();
+  g.save(); g.scale(k,k); g.imageSmoothingQuality='high'; g.drawImage(img,0,0,imgW,imgH); if(st.grid) drawGrid(g,imgW,imgH,U); drawAll(g); g.restore();
   if(band){
     g.fillStyle='#10141a'; g.fillRect(0,H,W,band); g.fillStyle='#f2a33a'; g.fillRect(0,H,W,Math.max(2,band*.06));
     const pad=band*.38, fs=band*.42, cy=H+band*.53; g.textBaseline='middle';
