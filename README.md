@@ -23,6 +23,19 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 | Grenade | `N` | Zone d'explosion avec l'icône de la grenade |
 | Gomme | `E` | Effacer un élément au clic ou au glisser |
 
+### 🎨 Couleurs des rôles
+Les pions alliés prennent automatiquement la couleur de leur rôle (case **« Couleurs des rôles »**) :
+
+| Pion | Couleur | Rôle |
+|---|---|---|
+| 1 | 🔵 Bleu | Ancre AC |
+| 2 | 🟢 Vert | Flex AC |
+| 3 | 🟠 Orange | Entry B |
+| 4 | 🔴 Rouge | Support B |
+| 5 | 🟣 Violet | Ancre B |
+
+Ces 5 couleurs sont aussi disponibles pour le **stylo**, les **flèches**, les **pings** et les **cônes**, pour dessiner le trajet de chaque joueur dans sa couleur. Un pion allié sélectionné peut aussi changer de couleur à la main.
+
 ### 👁️ Champ de vision des pions
 - Pose le pion, puis **glisse sans lâcher** vers l'endroit où il doit regarder.
 - Pour le réorienter, sélectionne le pion et attrape le **rond blanc** au bout du cône.
@@ -60,7 +73,7 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 
 ## 📝 Nouveautés
 
-- **Novembre 2026** : trajectoire des smokes et grenades réglable avec une poignée, champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
+- **Novembre 2026** : couleurs des rôles (pions, stylo, flèches, pings), trajectoire des smokes et grenades réglable avec une poignée, champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
 - **Octobre 2026** : première version (pions, drapeaux, dessin, flèches, ping, export PNG, sauvegarde `.json`).
 
 ---

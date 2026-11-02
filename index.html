@@ -88,6 +88,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .check input{accent-color:var(--accent);width:16px;height:16px}
+.roles{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12.5px}
+.roles li{display:flex;align-items:center;gap:6px}
+.roles i{width:10px;height:10px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.4)}
 .hint{font-size:12px;color:var(--mute);line-height:1.45;margin:0}
 .hint kbd{font-family:var(--f-mono);font-size:11px;background:var(--raise);border:1px solid var(--line);border-radius:3px;padding:0 4px}
 
@@ -165,6 +168,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       </div>
       <div class="nums" id="nums"></div>
       <label class="check"><input type="checkbox" id="fov" checked> Champ de vision 65°</label>
+      <label class="check"><input type="checkbox" id="roles" checked> Couleurs des rôles (alliés)</label>
+      <ul class="roles">
+        <li><i style="background:var(--blue)"></i>1 · Ancre AC</li>
+        <li><i style="background:#36d07a"></i>2 · Flex AC</li>
+        <li><i style="background:#ff9a2e"></i>3 · Entry B</li>
+        <li><i style="background:var(--red)"></i>4 · Support B</li>
+        <li><i style="background:#b26bff"></i>5 · Ancre B</li>
+      </ul>
       <p class="hint">Touche la carte pour poser le pion, puis glisse sans lâcher vers l'endroit où il doit regarder. Pour le tourner plus tard, sélectionne-le et attrape le rond blanc au bout du cône. Glisse le pion lui-même pour le déplacer.</p>
     </section>
 
@@ -245,20 +256,22 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 const $ = s => document.querySelector(s);
 const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
 
-const BLUE='#3d8bff', RED='#ff4d4d', YEL='#ffd23f';
-const COLORS = [{c:BLUE,n:'Nous'},{c:RED,n:'Adversaire'},{c:YEL,n:'Neutre'},{c:'#36d07a',n:'Vert'},{c:'#f5f7fa',n:'Blanc'}];
+const BLUE='#3d8bff', RED='#ff4d4d', YEL='#ffd23f', GREEN='#36d07a', ORANGE='#ff9a2e', VIOLET='#b26bff', WHITE='#f5f7fa';
+const ROLE={1:BLUE,2:GREEN,3:ORANGE,4:RED,5:VIOLET};
+const COLORS = [{c:BLUE,n:'Bleu · Ancre AC'},{c:GREEN,n:'Vert · Flex AC'},{c:ORANGE,n:'Orange · Entry B'},{c:RED,n:'Rouge · Support B'},{c:VIOLET,n:'Violet · Ancre B'},{c:YEL,n:'Jaune · Neutre'},{c:WHITE,n:'Blanc'}];
 const FLAGS = ['A','B','C'];
 const OUT = '#0b0e12';
 
 let img=null, imgW=1600, imgH=1000, U=1.6;
 let objs=[], undoS=[], redoS=[];
 const view={s:1,x:0,y:0};
-const st={tool:'pawn', team:'b', num:1, flag:'A', color:BLUE, size:1, dash:false, sel:null, grid:false, cone:70, fov:true, mini:true};
+const st={tool:'pawn', team:'b', num:1, flag:'A', color:BLUE, size:1, dash:false, sel:null, grid:false, cone:70, fov:true, mini:true, roles:true};
 let needFit=true;
 
 const lum = h => { const n=parseInt(h.slice(1),16); return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255; };
 const ink = h => lum(h)>0.62 ? OUT : '#fff';
 const teamColor = t => t==='r' ? RED : BLUE;
+const pawnColor = o => o.team==='r' ? RED : (o.color || BLUE);
 function rrect(c,x,y,w,h,r){c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
 function snap(){ undoS.push(JSON.stringify(objs)); if(undoS.length>150) undoS.shift(); redoS.length=0; syncUndo(); }
 let lastSnap=0; function snapSoft(){ const t=Date.now(); if(t-lastSnap>700) snap(); lastSnap=t; }
@@ -268,13 +281,13 @@ const FONT = (w,px) => `${w} ${px}px "Saira Condensed","Arial Narrow",sans-serif
 
 /* ---------- Drawing (image space) ---------- */
 function drawPawn(c,o,u){
-  const r=15*u*o.size, col=teamColor(o.team);
+  const r=15*u*o.size, col=pawnColor(o);
   c.save(); c.translate(o.x,o.y);
   c.beginPath(); c.arc(0,r*.18,r*1.02,0,Math.PI*2); c.fillStyle='rgba(0,0,0,.35)'; c.fill();
   c.beginPath(); c.arc(0,0,r,0,Math.PI*2); c.fillStyle=col; c.fill();
   c.lineWidth=2.4*u*Math.max(.8,o.size); c.strokeStyle=OUT; c.stroke();
   c.beginPath(); c.arc(0,0,r*.78,0,Math.PI*2); c.lineWidth=1.2*u*o.size; c.strokeStyle='rgba(255,255,255,.55)'; c.stroke();
-  c.fillStyle='#fff'; c.font=FONT(700,r*1.25); c.textAlign='center'; c.textBaseline='middle'; c.fillText(String(o.n),0,r*.08);
+  c.fillStyle=ink(col); c.font=FONT(700,r*1.25); c.textAlign='center'; c.textBaseline='middle'; c.fillText(String(o.n),0,r*.08);
   c.restore();
 }
 function drawFlag(c,o,u){
@@ -324,7 +337,7 @@ const SMOKE_PUFFS=[[0,0,1],[-.45,-.3,.62],[.48,-.25,.66],[-.5,.32,.6],[.42,.38,.
 const FOV=65, FOV_LEN=4.2;
 function fovTip(o){ const L=15*U*o.size*FOV_LEN; return {x:o.x+Math.cos(o.dir)*L, y:o.y+Math.sin(o.dir)*L}; }
 function drawFov(c,o,u){
-  if(o.dir==null) return; const col=teamColor(o.team), L=15*u*o.size*FOV_LEN, h=FOV*Math.PI/360;
+  if(o.dir==null) return; const col=pawnColor(o), L=15*u*o.size*FOV_LEN, h=FOV*Math.PI/360;
   c.save(); c.beginPath(); c.moveTo(o.x,o.y); c.arc(o.x,o.y,L,o.dir-h,o.dir+h); c.closePath();
   const g=c.createRadialGradient(o.x,o.y,0,o.x,o.y,L); g.addColorStop(0,hexA(col,.5)); g.addColorStop(1,hexA(col,.08));
   c.fillStyle=g; c.fill(); c.lineJoin='round'; c.lineWidth=1.4*u; c.strokeStyle=hexA(col,.75); c.stroke(); c.restore();
@@ -419,7 +432,7 @@ function loadSample(){
     {t:'flag',label:'A',x:250,y:500,color:BLUE,size:1},
     {t:'flag',label:'B',x:800,y:500,color:YEL,size:1},
     {t:'flag',label:'C',x:1350,y:500,color:RED,size:1},
-    ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'b',n,x:[150,200,250,300,350][i],y:[420,380,600,560,430][i],size:1,dir:[-.3,-.8,1.2,.4,0][i]})),
+    ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'b',n,color:ROLE[n],x:[150,200,250,300,350][i],y:[420,380,600,560,430][i],size:1,dir:[-.3,-.8,1.2,.4,0][i]})),
     ...[1,2,3,4,5].map((n,i)=>({t:'pawn',team:'r',n,x:[1300,1360,1420,1460,1250][i],y:[400,600,420,560,610][i],size:1,dir:[Math.PI,2.6,3.5,Math.PI,2.9][i]})),
     {t:'smoke',mini:true,fx:250,fy:600,x:470,y:760,size:1},
     {t:'arrow',x1:330,y1:410,x2:700,y2:420,color:BLUE,size:1,dash:false},
@@ -520,7 +533,7 @@ cv.addEventListener('pointerdown',e=>{
   if(st.tool==='smoke'||st.tool==='nade'){ const h=hit(p); if(h&&h.t===st.tool){ select(h); act={type:'move',o:h,last:p,moved:false}; return; } }
   switch(st.tool){
     case 'select': { const h=hit(p); if(h){ select(h); act={type:'move',o:h,last:p,moved:false}; } else { select(null); act=startPan(s); } break; }
-    case 'pawn': { snap(); select(null); const o={t:'pawn',team:st.team,n:st.num,x:p.x,y:p.y,size:st.size,dir:st.fov?defaultDir(p):null}; objs.push(o); advanceNum();
+    case 'pawn': { snap(); select(null); const o={t:'pawn',team:st.team,n:st.num,x:p.x,y:p.y,size:st.size,dir:st.fov?defaultDir(p):null}; if(st.team==='b') o.color=st.roles?ROLE[st.num]:st.color; objs.push(o); advanceNum();
       act=st.fov?{type:'aim',o,snapped:true}:{type:'move',o,last:p,moved:true}; break; }
     case 'flag': { snap(); const o={t:'flag',label:st.flag,x:p.x,y:p.y,color:st.color,size:st.size}; objs.push(o); advanceFlag(); act={type:'move',o,last:p,moved:true}; break; }
     case 'ping': { snap(); const o={t:'ping',x:p.x,y:p.y,color:st.color,size:st.size}; objs.push(o); act={type:'move',o,last:p,moved:true}; break; }
@@ -573,7 +586,7 @@ function advanceNum(){ const used=placedNums(st.team); for(let k=1;k<=5;k++){ co
 function advanceFlag(){ const used=placedFlags(); const nx=FLAGS.find(f=>!used.has(f)); if(nx) st.flag=nx; syncPickers(); }
 const numsEl=$('#nums'), flagsEl=$('#flags');
 [1,2,3,4,5].forEach(n=>{ const b=document.createElement('button'); b.className='chipbtn'; b.textContent=n; b.dataset.n=n; b.setAttribute('aria-label','Pion '+n);
-  b.onclick=()=>{ st.num=n; if(st.sel&&st.sel.t==='pawn') applyToSel(o=>o.n=n); setTool('pawn',true); syncPickers(); }; numsEl.append(b); });
+  b.onclick=()=>{ st.num=n; if(st.sel&&st.sel.t==='pawn') applyToSel(o=>{ o.n=n; if(o.team==='b'&&st.roles) o.color=ROLE[n]; }); setTool('pawn',true); syncPickers(); }; numsEl.append(b); });
 FLAGS.forEach(f=>{ const b=document.createElement('button'); b.className='chipbtn flag'; b.textContent=f; b.dataset.f=f; b.setAttribute('aria-label','Drapeau '+f);
   b.onclick=()=>{ st.flag=f; if(st.sel&&st.sel.t==='flag') applyToSel(o=>o.label=f); setTool('flag',true); syncPickers(); }; flagsEl.append(b); });
 document.querySelectorAll('.team').forEach(b=>b.onclick=()=>{ st.team=b.dataset.team; st.color=teamColor(st.team);
@@ -583,7 +596,7 @@ function advanceNumFrom1(){ const used=placedNums(st.team); const n=[1,2,3,4,5].
 function syncPickers(){
   const used=placedNums(st.team), uf=placedFlags();
   numsEl.querySelectorAll('.chipbtn').forEach(b=>{ const n=+b.dataset.n; b.classList.toggle('placed',used.has(n)); b.setAttribute('aria-pressed',String(n===st.num));
-    b.style.color=teamColor(st.team); });
+    b.style.color=(st.team==='b'&&st.roles)?ROLE[n]:teamColor(st.team); });
   flagsEl.querySelectorAll('.chipbtn').forEach(b=>{ b.classList.toggle('placed',uf.has(b.dataset.f)); b.setAttribute('aria-pressed',String(b.dataset.f===st.flag)); });
   document.querySelectorAll('.team').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.team===st.team)));
   draw();
@@ -592,14 +605,17 @@ function syncPickers(){
 /* ---------- Selection & properties ---------- */
 function select(o){
   st.sel=o; $('#secSel').hidden=!o;
-  if(o){ st.size=o.size; if(o.color) st.color=o.color; if('dash' in o) st.dash=o.dash;
+  if(o){ st.size=o.size; if(o.color) st.color=o.color; if(o.t==='pawn') st.color=pawnColor(o); if('dash' in o) st.dash=o.dash;
     if(o.t==='pawn'){ st.team=o.team; st.num=o.n; } if(o.t==='flag') st.flag=o.label; if(o.t==='cone') st.cone=o.a||70; syncUI(); }
   updatePanels(); draw();
 }
 function applyToSel(fn){ if(st.sel){ snapSoft(); fn(st.sel); draw(); } }
 const sw=$('#swatches');
 COLORS.forEach(col=>{ const b=document.createElement('button'); b.className='sw'; b.style.background=col.c; b.title=col.n; b.dataset.c=col.c; b.setAttribute('aria-label',col.n);
-  b.onclick=()=>{ st.color=col.c; applyToSel(o=>{ if('color' in o) o.color=col.c; }); syncUI(); }; sw.append(b); });
+  b.onclick=()=>{ st.color=col.c; applyToSel(o=>{ if('color' in o || (o.t==='pawn'&&o.team==='b')) o.color=col.c; }); syncUI(); }; sw.append(b); });
+$('#roles').addEventListener('change',e=>{ st.roles=e.target.checked; snap();
+  for(const o of objs) if(o.t==='pawn'&&o.team==='b') o.color=st.roles?ROLE[o.n]:BLUE;
+  if(st.sel&&st.sel.t==='pawn') st.color=pawnColor(st.sel); syncUI(); });
 $('#size').addEventListener('input',e=>{ st.size=+e.target.value; $('#sizeVal').textContent=Math.round(st.size*100)+' %'; applyToSel(o=>o.size=st.size); });
 $('#dashSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; st.dash=b.dataset.dash==='1'; applyToSel(o=>{ if('dash' in o) o.dash=st.dash; }); syncUI(); });
 function syncUI(){
@@ -624,7 +640,7 @@ function updatePanels(){
   $('#secCone').hidden=t!=='cone';
   $('#secThrow').hidden=!(t==='smoke'||t==='nade'); $('#throwTitle').textContent=t==='nade'?'Grenade':'Smoke'; $('#smokeSeg').hidden=t!=='smoke';
   $('#fov').checked = st.sel&&st.sel.t==='pawn' ? st.sel.dir!=null : st.fov;
-  $('#secColor').hidden=['pawn','smoke','nade'].includes(t);
+  $('#secColor').hidden = t==='pawn' ? (st.sel?st.sel.team:st.team)==='r' : ['smoke','nade'].includes(t);
   $('#dashSeg').hidden=!['pen','arrow'].includes(t);
 }
 function setTool(t,keepSel){
