@@ -21,6 +21,7 @@ Le principe est le même qu'un entraîneur qui dessine la tactique au tableau : 
 | Cône de vision | `C` | Zone transparente pour définir une ligne à tenir, avec ouverture réglable de 15° à 180° |
 | Smoke | `S` | **Petit nuage** pour pinguer où smoker, ou **zone de fumée** en grand |
 | Grenade | `N` | Zone d'explosion avec l'icône de la grenade |
+| Texte | `T` | Callouts sur la carte (TRANSIT, JUNGLE…), inclinables pour suivre une rue |
 | Gomme | `E` | Effacer un élément au clic ou au glisser |
 
 ### 🎨 Couleurs des rôles
@@ -40,6 +41,11 @@ Ces 5 couleurs sont aussi disponibles pour le **stylo**, les **flèches**, les *
 - Pose le pion, puis **glisse sans lâcher** vers l'endroit où il doit regarder.
 - Pour le réorienter, sélectionne le pion et attrape le **rond blanc** au bout du cône.
 - La case **« Champ de vision 65° »** l'active ou le désactive.
+
+### 🔤 Texte
+- Touche la carte à l'endroit voulu, écris, puis valide avec **Entrée**.
+- Pour l'**incliner** le long d'une rue, sélectionne le texte et fais tourner le **rond blanc** au bout (l'angle s'aimante tous les 15°).
+- Pour corriger un texte, sélectionne-le et modifie-le dans le panneau. La couleur et la taille se changent aussi depuis le panneau.
 
 ### ☁️ Smokes et grenades
 - **Clic simple** : l'objet est posé au point d'impact.
@@ -73,7 +79,7 @@ Ces 5 couleurs sont aussi disponibles pour le **stylo**, les **flèches**, les *
 
 ## 📝 Nouveautés
 
-- **Novembre 2026** : couleurs des rôles (pions, stylo, flèches, pings), trajectoire des smokes et grenades réglable avec une poignée, champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
+- **Novembre 2026** : outil Texte pour les callouts, couleurs des rôles (pions, stylo, flèches, pings), trajectoire des smokes et grenades réglable avec une poignée, champ de vision de 65° sur les pions, cône de vision réglable, smoke (petit nuage ou zone) et grenade avec trajectoire de lancer.
 - **Octobre 2026** : première version (pions, drapeaux, dessin, flèches, ping, export PNG, sauvegarde `.json`).
 
 ---

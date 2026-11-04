@@ -62,6 +62,7 @@ input[type=file]{display:none}
 .zoombox button{width:32px;height:32px;background:rgba(23,29,37,.9);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-family:var(--f-mono)}
 .drop{position:absolute;inset:0;display:grid;place-items:center;background:rgba(242,163,58,.12);border:2px dashed var(--accent);border-radius:10px;font-family:var(--f-display);font-size:24px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);pointer-events:none}
 
+#txt{position:absolute;z-index:3;background:var(--panel);border:1px solid var(--accent);border-radius:5px;padding:6px 9px;width:220px;max-width:70%;font-size:16px}
 .side{grid-area:side;display:flex;flex-direction:column;gap:14px;overflow:auto;padding:2px 2px 8px;min-height:0}
 .sec{display:flex;flex-direction:column;gap:8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
 .sec:last-child{border-bottom:0}
@@ -141,6 +142,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <button class="tool" data-tool="cone" title="Cône de vision (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19L19 6a9 9 0 0 1 1 9z" fill="currentColor" fill-opacity=".25"/><circle cx="4" cy="19" r="1.6" fill="currentColor"/></svg><kbd>C</kbd></button>
     <button class="tool" data-tool="smoke" title="Smoke (S)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6-1.2A4.5 4.5 0 0 1 17 18z"/></svg><kbd>S</kbd></button>
     <button class="tool" data-tool="nade" title="Grenade (N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="14" r="6"/><path d="M11 8V5h4M14 5l3-2"/></svg><kbd>N</kbd></button>
+    <button class="tool" data-tool="text" title="Texte (T)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><kbd>T</kbd></button>
     <button class="tool" data-tool="eraser" title="Gomme (E)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 20h12M5 15l9-9 5 5-8 8H8z"/></svg><kbd>E</kbd></button>
     <hr>
     <button class="tool" id="btnUndo" title="Annuler (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
@@ -157,6 +159,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     </div>
     <div class="coords" id="coords">—</div>
     <div class="drop" id="drop" hidden>Lâche ta carte ici</div>
+    <input class="inp" id="txt" hidden placeholder="Écris puis Entrée" maxlength="40" autocomplete="off">
   </main>
 
   <aside class="side">
@@ -198,6 +201,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <button data-mini="0" aria-pressed="false">Zone de fumée</button>
       </div>
       <p class="hint">Clic simple : pose à l'impact. Glisse du lanceur vers l'impact pour afficher la trajectoire en pointillé. Pour la modifier ensuite, sélectionne la smoke et attrape le rond blanc au point de lancer : la trajectoire pivote autour du nuage. Ramène le rond sur le nuage pour supprimer la trajectoire.</p>
+    </section>
+
+    <section class="sec" id="secText" hidden>
+      <h3>Texte</h3>
+      <input class="inp" id="textVal" placeholder="Sélectionne un texte pour le modifier" maxlength="40" autocomplete="off">
+      <p class="hint">Touche la carte à l'endroit voulu, écris, puis valide avec Entrée. Pour l'incliner le long d'une rue, sélectionne le texte et fais tourner le rond blanc au bout.</p>
     </section>
 
     <section class="sec" id="secColor">
@@ -387,9 +396,20 @@ function drawCone(c,o,u){
   c.restore();
 }
 function hexA(h,a){ const n=parseInt(h.slice(1),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
-const DRAW={pawn:drawPawn,flag:drawFlag,ping:drawPing,arrow:drawArrow,pen:drawPen,smoke:drawSmoke,nade:drawNade,cone:drawCone};
+function drawText(c,o,u){
+  const fs=20*u*o.size; c.save(); c.translate(o.x,o.y); c.rotate(o.rot||0);
+  c.font=FONT(700,fs); c.textAlign='center'; c.textBaseline='middle'; c.lineJoin='round';
+  c.shadowColor=hexA(o.color===WHITE?'#8fc3ff':o.color,.85); c.shadowBlur=9*u;
+  c.lineWidth=fs*.2; c.strokeStyle='rgba(11,14,18,.85)'; c.strokeText(o.text,0,fs*.04);
+  c.shadowBlur=0; c.fillStyle=o.color; c.fillText(o.text,0,fs*.04); c.restore();
+}
+function textW(o){ ctx.save(); ctx.font=FONT(700,20*U*o.size); const w=ctx.measureText(o.text).width; ctx.restore(); return w; }
+function textHandle(o){ const w=textW(o)/2+16*U, r=o.rot||0; return {x:o.x+Math.cos(r)*w, y:o.y+Math.sin(r)*w}; }
+function hitText(o,p,tol){ const dx=p.x-o.x, dy=p.y-o.y, r=o.rot||0, lx=dx*Math.cos(r)+dy*Math.sin(r), ly=-dx*Math.sin(r)+dy*Math.cos(r);
+  return Math.abs(lx)<textW(o)/2+tol && Math.abs(ly)<10*U*o.size+tol; }
+const DRAW={pawn:drawPawn,flag:drawFlag,ping:drawPing,arrow:drawArrow,pen:drawPen,smoke:drawSmoke,nade:drawNade,cone:drawCone,text:drawText};
 const drawObj=(c,o,u)=>DRAW[o.t](c,o,u);
-const LAYER={cone:0,smoke:1,nade:2,pen:2,arrow:2,flag:3,ping:3,pawn:4};
+const LAYER={cone:0,smoke:1,nade:2,pen:2,arrow:2,flag:3,ping:3,pawn:4,text:5};
 const ordered=()=>objs.map((o,i)=>[o,i]).sort((a,b)=>(lay(a[0])-lay(b[0]))||(a[1]-b[1])).map(x=>x[0]);
 const lay=o=>o.t==='smoke'&&o.mini?2.5:LAYER[o.t];
 function drawAll(c){
@@ -466,19 +486,25 @@ function render(){
   if(st.sel&&(st.sel.t==='smoke'||st.sel.t==='nade')){ const h=throwHandle(st.sel), r=7/view.s;
     ctx.save(); if(st.sel.fx==null){ ctx.beginPath(); ctx.moveTo(st.sel.x,st.sel.y); ctx.lineTo(h.x,h.y); ctx.setLineDash([4/view.s,4/view.s]); ctx.lineWidth=1.4/view.s; ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.stroke(); ctx.setLineDash([]); }
     ctx.beginPath(); ctx.arc(h.x,h.y,r,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=2/view.s; ctx.strokeStyle='#f2a33a'; ctx.stroke(); ctx.restore(); }
+  if(st.sel&&st.sel.t==='text'){ const h=textHandle(st.sel), r=7/view.s;
+    ctx.save(); ctx.beginPath(); ctx.moveTo(st.sel.x,st.sel.y); ctx.lineTo(h.x,h.y); ctx.setLineDash([4/view.s,4/view.s]); ctx.lineWidth=1.4/view.s; ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.stroke();
+    ctx.setLineDash([]); ctx.beginPath(); ctx.arc(h.x,h.y,r,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=2/view.s; ctx.strokeStyle='#f2a33a'; ctx.stroke(); ctx.restore(); }
   if(st.sel){ const b=bbox(st.sel); ctx.save(); ctx.setLineDash([6/view.s,4/view.s]); ctx.lineWidth=1.6/view.s; ctx.strokeStyle='#f2a33a'; ctx.strokeRect(b.x-6*U,b.y-6*U,b.w+12*U,b.h+12*U); ctx.restore(); }
   $('#chip').innerHTML=chipText();
 }
 function chipText(){
-  const t={select:'Déplacer',pawn:'Pion',flag:'Drapeau',pen:'Dessin libre',arrow:'Flèche',ping:'Ping',cone:'Cône de vision',smoke:'Smoke',nade:'Grenade',eraser:'Gomme'}[st.tool];
+  const t={select:'Déplacer',pawn:'Pion',flag:'Drapeau',pen:'Dessin libre',arrow:'Flèche',ping:'Ping',cone:'Cône de vision',smoke:'Smoke',nade:'Grenade',text:'Texte',eraser:'Gomme'}[st.tool];
   const d={select:'glisse un élément pour le déplacer',pawn:`pose ${st.team==='b'?'notre':'leur'} n°${st.num}${st.fov?', glisse pour l\u2019orienter':''}`,flag:'clique pour poser le drapeau '+st.flag,
     pen:'maintiens et dessine',arrow:'glisse du départ vers l’arrivée',ping:'clique pour pinguer',cone:'glisse du joueur vers la zone à surveiller',
-    smoke:'clique sur l’impact, ou glisse du lanceur vers l’impact',nade:'clique sur l’impact, ou glisse du lanceur vers l’impact',eraser:'clique ou glisse sur un élément'}[st.tool];
+    smoke:'clique sur l’impact, ou glisse du lanceur vers l’impact',nade:'clique sur l’impact, ou glisse du lanceur vers l’impact',text:'touche la carte pour écrire',eraser:'clique ou glisse sur un élément'}[st.tool];
   return `<strong>${t}</strong> · ${d}`;
 }
 
 /* ---------- Geometry ---------- */
 function bbox(o){
+  if(o.t==='text'){ const w=textW(o)/2, h=10*U*o.size, r=o.rot||0, cs=Math.cos(r), sn=Math.sin(r);
+    const xs=[], ys=[]; for(const [a,b] of [[-w,-h],[w,-h],[w,h],[-w,h]]){ xs.push(o.x+a*cs-b*sn); ys.push(o.y+a*sn+b*cs); }
+    const x=Math.min(...xs), y=Math.min(...ys); return {x,y,w:Math.max(...xs)-x,h:Math.max(...ys)-y}; }
   if(o.t==='pawn'||o.t==='ping'){ const r=15*U*o.size*1.1; return {x:o.x-r,y:o.y-r,w:2*r,h:2*r}; }
   if(o.t==='flag'){ const r=17*U*o.size*1.3; return {x:o.x-r,y:o.y-r,w:2*r,h:2*r}; }
   if(o.t==='arrow') return {x:Math.min(o.x1,o.x2),y:Math.min(o.y1,o.y2),w:Math.abs(o.x2-o.x1),h:Math.abs(o.y2-o.y1)};
@@ -496,6 +522,7 @@ function hit(p, onlyTokens){
   const tol=8/view.s;
   const list=ordered();
   for(let i=list.length-1;i>=0;i--){ const o=list[i];
+    if(o.t==='text'){ if(!onlyTokens&&hitText(o,p,tol)) return o; continue; }
     if(o.t==='pawn'||o.t==='ping'){ if(Math.hypot(p.x-o.x,p.y-o.y)<15*U*o.size*1.1+tol) return o; }
     else if(o.t==='flag'){ if(Math.abs(p.x-o.x)+Math.abs(p.y-o.y)<17*U*o.size*1.3+tol) return o; }
     else if(onlyTokens) continue;
@@ -522,6 +549,7 @@ const startPan=s=>({type:'pan',sx:s.x,sy:s.y,vx:view.x,vy:view.y});
 
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 cv.addEventListener('pointerdown',e=>{
+  if(!$('#txt').hidden){ commitText(); return; }
   cv.setPointerCapture(e.pointerId); const s=local(e); ptrs.set(e.pointerId,s);
   if(ptrs.size===2){ act=null; const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),cx:(a.x+b.x)/2,cy:(a.y+b.y)/2}; draw(); return; }
   if(ptrs.size>2) return;
@@ -529,6 +557,7 @@ cv.addEventListener('pointerdown',e=>{
   const p=toImg(s);
   if(st.sel&&st.sel.t==='pawn'&&st.sel.dir!=null&&st.tool!=='eraser'){ const tp=fovTip(st.sel); if(Math.hypot(p.x-tp.x,p.y-tp.y)<16/view.s){ act={type:'aim',o:st.sel,snapped:false}; return; } }
   if(st.sel&&(st.sel.t==='smoke'||st.sel.t==='nade')&&st.tool!=='eraser'){ const h=throwHandle(st.sel); if(Math.hypot(p.x-h.x,p.y-h.y)<16/view.s){ act={type:'throw',o:st.sel,snapped:false}; return; } }
+  if(st.sel&&st.sel.t==='text'&&st.tool!=='eraser'){ const h=textHandle(st.sel); if(Math.hypot(p.x-h.x,p.y-h.y)<16/view.s){ act={type:'rot',o:st.sel,snapped:false}; return; } }
   if(['pawn','flag','ping'].includes(st.tool)){ const h=hit(p,true); if(h){ select(h); act={type:'move',o:h,last:p,moved:false}; return; } }
   if(st.tool==='smoke'||st.tool==='nade'){ const h=hit(p); if(h&&h.t===st.tool){ select(h); act={type:'move',o:h,last:p,moved:false}; return; } }
   switch(st.tool){
@@ -541,6 +570,7 @@ cv.addEventListener('pointerdown',e=>{
     case 'arrow': act={type:'draw',o:{t:'arrow',x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:st.color,size:st.size,dash:st.dash}}; break;
     case 'cone': act={type:'draw',o:{t:'cone',x:p.x,y:p.y,x2:p.x,y2:p.y,a:st.cone,color:st.color,size:st.size}}; break;
     case 'smoke': case 'nade': { const o={t:st.tool,fx:p.x,fy:p.y,x:p.x,y:p.y,size:st.size}; if(st.tool==='smoke'&&st.mini) o.mini=true; act={type:'draw',o}; break; }
+    case 'text': { const h=hit(p); if(h&&h.t==='text'){ select(h); act={type:'move',o:h,last:p,moved:false}; } else { select(null); openText(s,p); } break; }
     case 'eraser': act={type:'erase',snapped:false}; eraseAt(p); break;
   }
   draw();
@@ -556,6 +586,8 @@ cv.addEventListener('pointermove',e=>{
   else if(act.type==='move'){ if(!act.moved){ snap(); act.moved=true; } move(act.o,p.x-act.last.x,p.y-act.last.y); act.last=p; draw(); }
   else if(act.type==='aim'){ const o=act.o; if(Math.hypot(p.x-o.x,p.y-o.y)>6*U){ if(!act.snapped){ snap(); act.snapped=true; } o.dir=Math.atan2(p.y-o.y,p.x-o.x); draw(); } }
   else if(act.type==='throw'){ const o=act.o; if(!act.snapped){ snap(); act.snapped=true; } o.fx=p.x; o.fy=p.y; draw(); }
+  else if(act.type==='rot'){ const o=act.o; if(Math.hypot(p.x-o.x,p.y-o.y)>8*U){ if(!act.snapped){ snap(); act.snapped=true; }
+    let r=Math.atan2(p.y-o.y,p.x-o.x); const q=Math.round(r/(Math.PI/12))*(Math.PI/12); if(Math.abs(r-q)<.05) r=q; o.rot=r; draw(); } }
   else if(act.type==='draw'){ const o=act.o;
     if(o.t==='pen'){ const lx=o.pts[o.pts.length-2], ly=o.pts[o.pts.length-1]; if(Math.hypot(p.x-lx,p.y-ly)>2/view.s) o.pts.push(p.x,p.y); }
     else if(o.t==='smoke'||o.t==='nade'){ o.x=p.x; o.y=p.y; }
@@ -606,7 +638,7 @@ function syncPickers(){
 function select(o){
   st.sel=o; $('#secSel').hidden=!o;
   if(o){ st.size=o.size; if(o.color) st.color=o.color; if(o.t==='pawn') st.color=pawnColor(o); if('dash' in o) st.dash=o.dash;
-    if(o.t==='pawn'){ st.team=o.team; st.num=o.n; } if(o.t==='flag') st.flag=o.label; if(o.t==='cone') st.cone=o.a||70; syncUI(); }
+    if(o.t==='pawn'){ st.team=o.team; st.num=o.n; } if(o.t==='flag') st.flag=o.label; if(o.t==='cone') st.cone=o.a||70; if(o.t==='text') $('#textVal').value=o.text; syncUI(); }
   updatePanels(); draw();
 }
 function applyToSel(fn){ if(st.sel){ snapSoft(); fn(st.sel); draw(); } }
@@ -628,6 +660,14 @@ function syncUI(){
   $('#fov').checked = st.sel&&st.sel.t==='pawn' ? st.sel.dir!=null : st.fov;
   syncPickers();
 }
+/* ---------- Text entry ---------- */
+let textAt=null;
+function openText(s,p){ const t=$('#txt'); textAt=p; t.value=''; t.style.left=Math.max(4,Math.min(s.x-20,cwCss-230))+'px'; t.style.top=Math.max(4,s.y-20)+'px'; t.hidden=false; setTimeout(()=>t.focus(),0); }
+function commitText(){ const t=$('#txt'); if(t.hidden) return; const v=t.value.trim(); t.hidden=true;
+  if(v&&textAt){ snap(); const o={t:'text',x:textAt.x,y:textAt.y,text:v,color:st.color,size:st.size,rot:0}; objs.push(o); select(o); } textAt=null; draw(); }
+$('#txt').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commitText(); } if(e.key==='Escape'){ $('#txt').hidden=true; textAt=null; } });
+$('#txt').addEventListener('blur',()=>setTimeout(commitText,0));
+$('#textVal').addEventListener('input',e=>{ const v=e.target.value; if(st.sel&&st.sel.t==='text'&&v.trim()) applyToSel(o=>o.text=v); });
 $('#fov').addEventListener('change',e=>{ const on=e.target.checked;
   if(st.sel&&st.sel.t==='pawn') applyToSel(o=>o.dir=on?(o.dir!=null?o.dir:defaultDir(o)):null); else st.fov=on; });
 $('#smokeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; st.mini=b.dataset.mini==='1';
@@ -638,6 +678,7 @@ function updatePanels(){
   $('#secPawn').hidden=t!=='pawn';
   $('#secFlag').hidden=t!=='flag';
   $('#secCone').hidden=t!=='cone';
+  $('#secText').hidden=t!=='text'; if(!(st.sel&&st.sel.t==='text')) $('#textVal').value='';
   $('#secThrow').hidden=!(t==='smoke'||t==='nade'); $('#throwTitle').textContent=t==='nade'?'Grenade':'Smoke'; $('#smokeSeg').hidden=t!=='smoke';
   $('#fov').checked = st.sel&&st.sel.t==='pawn' ? st.sel.dir!=null : st.fov;
   $('#secColor').hidden = t==='pawn' ? (st.sel?st.sel.team:st.team)==='r' : ['smoke','nade'].includes(t);
@@ -647,6 +688,7 @@ function setTool(t,keepSel){
   st.tool=t; if(!keepSel) select(null);
   if(t==='pawn' && !keepSel) st.color=teamColor(st.team);
   if(t==='flag' && !keepSel && ![YEL,BLUE,RED].includes(st.color)) st.color=YEL;
+  if(t==='text' && !keepSel) st.color=WHITE;
   document.querySelectorAll('.tool[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===t)));
   cv.style.cursor=t==='select'?'default':t==='eraser'?'not-allowed':'crosshair';
   updatePanels(); syncUI();
@@ -673,7 +715,7 @@ document.addEventListener('keydown',e=>{
   if((e.key==='Delete'||e.key==='Backspace')&&st.sel){ e.preventDefault(); $('#btnDel').click(); return; }
   if(e.key==='Escape'){ select(null); return; }
   if(/^[1-5]$/.test(e.key)){ numsEl.querySelector(`[data-n="${e.key}"]`).click(); return; }
-  const t={v:'select',j:'pawn',d:'flag',p:'pen',f:'arrow',g:'ping',c:'cone',s:'smoke',n:'nade',e:'eraser'}[e.key.toLowerCase()]; if(t) setTool(t);
+  const t={v:'select',j:'pawn',d:'flag',p:'pen',f:'arrow',g:'ping',c:'cone',s:'smoke',n:'nade',t:'text',e:'eraser'}[e.key.toLowerCase()]; if(t) setTool(t);
 });
 document.addEventListener('keyup',e=>{ if(e.code==='Space'){ space=false; setTool(st.tool,true); } });
 
